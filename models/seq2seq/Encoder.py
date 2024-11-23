@@ -60,15 +60,17 @@ class Encoder(nn.Module):
         self.embedding = nn.Embedding(input_size,emb_size)
 
         if model_type == 'RNN':
-            self.rnn = nn.RNN(input_size,encoder_hidden_size)
+            self.rnn = nn.RNN(emb_size,encoder_hidden_size,batch_first=True)
         elif model_type == 'LSTM':
-            self.rnn = nn.LSTM(input_size,encoder_hidden_size)
+            self.rnn = nn.LSTM(emb_size,encoder_hidden_size,batch_first=True)
         else:
             raise ValueError("Layer is not 'RNN' or 'LSTM'.")
         
         self.fc1 = nn.Linear(encoder_hidden_size,encoder_hidden_size)
+        self.relu = nn.ReLU()
         self.fc2 = nn.Linear(encoder_hidden_size,decoder_hidden_size)
-        self.droupout = nn.Dropout(dropout)
+        self.tanh = nn.Tanh()
+        self.dropout = nn.Dropout(dropout)
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
@@ -96,18 +98,26 @@ class Encoder(nn.Module):
         #       If model_type is LSTM, the hidden variable returns a tuple          #
         #       containing both the hidden state and the cell state of the LSTM.    #
         #############################################################################
-        embeds = self.dropout(self.embedding(input))
-        out, hidden = self.rnn(embeds)
-        if self.model_type == 'RNN':
-            hidden = nn.ReLU(self.fc1(hidden))
-            hidden = torch.tanh(self.fc2(hidden))
-        elif self.model_type == 'LSTM':
-            hidden = (torch.tanh(hidden[0]), hidden[1])
+        #print('input: ', input)
+        embeds = self.embedding(input)
+        embed_drop = self.dropout(embeds)
 
-        output, hidden = out, hidden     #remove this line when you start implementing your code
+        output, hidden = self.rnn(embed_drop)
+
+        if self.model_type == 'RNN':
+            #print('RNN')
+            hidden = self.relu(self.fc1(hidden))
+            hidden = self.tanh(self.fc2(hidden))
+
+        elif self.model_type == 'LSTM':
+            #print('LSTM')
+            h, c = hidden
+            h = self.relu(self.fc1(h))
+            h = self.tanh(self.fc2(h))
+            hidden = (h,c)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
-
+        #print('encoder out: ', output.shape)
         return output, hidden

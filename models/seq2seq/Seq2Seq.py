@@ -75,29 +75,25 @@ class Seq2Seq(nn.Module):
         #          will have to be manipulated before being fed in as the decoder   #
         #          input at the next time step.                                     #
         #############################################################################
-        decoder_output_size = self.decoder.output_size
+        de_out_size = self.decoder.output_size
+        en_out_size, hidden = self.encoder(source)
 
-        # Initialize outputs tensor to store decoder outputs
-        outputs = torch.zeros(batch_size, seq_len, decoder_output_size).to(self.device)
+        outputs = torch.zeros(batch_size, seq_len, de_out_size).to(self.device)
+        input = source[:, 0].unsqueeze(1) 
+        #print('source,shape: ',b.size())
+        #print('source[:, 0]: ',source[:, 0])
+        #print('1st input: ', input.size(0))
 
-        # 1) Get the last hidden representation from the encoder
-        encoder_outputs, hidden = self.encoder(source)
-
-        # 2) Use the first token (<sos>) from the source sequence as the first input for the decoder
-        input = source[:, 0].unsqueeze(1)  # (batch_size, 1)
-
-        # 3) Feed input and hidden state to the decoder for each time step in the target sequence
         for t in range(seq_len):
-            # Pass the current input and the hidden state to the decoder
-            output, hidden = self.decoder(input, hidden, encoder_outputs, attention=self.decoder.attention)
 
-            # Store the decoder output at time step t
+            output, hidden = self.decoder(input, hidden, en_out_size,
+                                           attention=self.decoder.attention)
+
             outputs[:, t, :] = output
 
-            # 4) Use the current output to determine the next input
-            top1 = output.argmax(1)  # get the index of the highest logit
-            input = top1.unsqueeze(1)  # reshape to (batch_size, 1)
-        # initially set outputs as a tensor of zeros with dimensions (batch_size, seq_len, decoder_output_size)
+            top1 = output.argmax(1)
+            input = top1.unsqueeze(1)  
+            #print('ith input: ', input)
 
         #############################################################################
         #                              END OF YOUR CODE                             #

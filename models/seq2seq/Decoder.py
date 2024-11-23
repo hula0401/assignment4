@@ -56,11 +56,17 @@ class Decoder(nn.Module):
         #           of context vector and input                                     #
         # NOTE: Use nn.RNN and nn.LSTM instead of the naive implementation          #
         #############################################################################
-        self.embedding = nn.Embedding(output_size,emb_size)
+        
+        #print('emb_size: ', emb_size, ' encoder_hidden_size: ',encoder_hidden_size)
+        rnn_input_size = emb_size + encoder_hidden_size if attention else emb_size
+        #print('RNN size: ', rnn_input_size)
+        self.embedding = nn.Embedding(output_size, emb_size)
+
+
         if model_type == "RNN":
-            self.rnn = nn.RNN(emb_size + (encoder_hidden_size if attention else 0), decoder_hidden_size, batch_first=True)
+            self.rnn = nn.RNN(emb_size, decoder_hidden_size, batch_first=True)
         elif model_type == "LSTM":
-            self.rnn = nn.LSTM(emb_size + (encoder_hidden_size if attention else 0), decoder_hidden_size, batch_first=True)
+            self.rnn = nn.LSTM(emb_size, decoder_hidden_size, batch_first=True)
         else:
             raise ValueError("it's not 'RNN' or 'LSTM'.")
         
@@ -69,7 +75,7 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
         if attention:
-            self.attention_layer = nn.Linear(encoder_hidden_size + emb_size, emb_size)
+            self.attention_layer = nn.Linear(rnn_input_size, decoder_hidden_size)
 
         #############################################################################
         #                              END OF YOUR CODE                             #
@@ -103,7 +109,6 @@ class Decoder(nn.Module):
         # Cosine similarity: q.K^T / (|q| * |K|)
         attention_scores = F.cosine_similarity(hidden.unsqueeze(1), encoder_outputs, dim=-1)  # (N, T)
         attention_prob = F.softmax(attention_scores, dim=-1).unsqueeze(1)
-        attention_prob = None   #remove this line when you start implementing your code
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
@@ -141,20 +146,21 @@ class Decoder(nn.Module):
         #       If model_type is LSTM, the hidden variable returns a tuple          #
         #       containing both the hidden state and the cell state of the LSTM.    #
         #############################################################################
-        embedded = self.dropout(self.embedding(input))  # (N, 1, emb_size)
+        #print("Input max index:", input.max(), "Min index:", input.min())
+        embedded = self.dropout(self.embedding(input))  
 
-        # 2) Attention mechanism
         if attention and encoder_outputs is not None:
             attention_prob = self.compute_attention(hidden[0] if self.model_type == "LSTM" else hidden, encoder_outputs)
-            context = torch.bmm(attention_prob, encoder_outputs)  # (N, 1, encoder_hidden_size)
-            embedded = torch.cat((embedded, context), dim=-1)  # (N, 1, emb_size + encoder_hidden_size)
+            context = torch.bmm(attention_prob, encoder_outputs)  
+            embedded = torch.cat((embedded, context), dim=-1)
             embedded = self.attention_layer(embedded)
+            embedded = torch.tanh(embedded)
 
         output, hidden = self.rnn(embedded, hidden)
 
-        output = self.log_softmax(self.out(output.squeeze(1)))  # (N, output_size)
+        output = self.log_softmax(self.out(output.squeeze(1))) 
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
-
+        #print('decoder output: ', output)
         return output, hidden

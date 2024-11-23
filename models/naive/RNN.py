@@ -55,8 +55,8 @@ class VanillaRNN(nn.Module):
         #    You MUST NOT use Pytorch RNN layers(nn.RNN, nn.LSTM, etc).             #
         #############################################################################
         self.hidden_layer = nn.Linear(input_size + hidden_size, hidden_size)
-        self.output_layer = nn.Linear(hidden_size, output_size)
-        self.tanh = nn.Tanh()  # Tanh for the hidden layer
+        self.output_layer = nn.Linear(input_size + hidden_size, output_size)
+        self.tanh = nn.Tanh()
         self.log_softmax = nn.LogSoftmax(dim=1)
 
         #############################################################################
@@ -81,9 +81,10 @@ class VanillaRNN(nn.Module):
         #   going over one time step. Please refer to the structure in the notebook.#                                              #
         #############################################################################
 
-        combined = torch.cat((input, hidden), dim=1)
-        hidden = self.tanh(self.hidden_layer(combined))
-        output = self.log_softmax(self.output_layer(hidden))
+        new_input = torch.cat((input, hidden), dim=1)
+
+        hidden = self.tanh(self.hidden_layer(new_input))
+        output = self.log_softmax(self.output_layer(new_input))
         #############################################################################
         #                              END OF YOUR CODE                             #
         #############################################################################
